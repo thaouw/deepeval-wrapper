@@ -6,6 +6,7 @@ from ..models.health import HealthResponse
 from ..models.auth import User
 from ..services.deepeval_service import DeepEvalService
 from ..config import settings
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/health", tags=["Health"])
 deepeval_service = DeepEvalService()
@@ -69,11 +70,10 @@ async def health_check():
 
 
 @router.get("/detailed")
-async def detailed_health_check():
+async def detailed_health_check(
+    current_user: User = Depends(get_current_user)
+):
     """Detailed health check - requires authentication."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
-    
     health_data = deepeval_service.health_check()
     
     return {

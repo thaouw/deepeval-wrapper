@@ -5,6 +5,7 @@ from fastapi.security import HTTPBearer
 from ..models.auth import Token, LoginRequest, User
 from ..services.auth_service import AuthService
 from ..config import settings
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer()
@@ -35,16 +36,16 @@ async def login(login_request: LoginRequest):
 
 
 @router.get("/me", response_model=User)
-async def read_users_me():
+async def read_users_me(
+    current_user: User = Depends(get_current_user)
+):
     """Get current user information."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
     return current_user
 
 
 @router.post("/validate-token")
-async def validate_token():
+async def validate_token(
+    current_user: User = Depends(get_current_user)
+):
     """Validate current token."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
     return {"valid": True, "user": current_user}

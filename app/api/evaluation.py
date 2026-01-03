@@ -15,6 +15,7 @@ from ..models.evaluation import (
 from ..services.deepeval_service import DeepEvalService
 from ..services.job_service import JobService
 from ..config import settings
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/evaluate", tags=["Evaluation"])
 deepeval_service = DeepEvalService()
@@ -22,11 +23,11 @@ job_service = JobService()
 
 
 @router.post("/", response_model=EvaluationResponse)
-async def evaluate_single(request: EvaluationRequest):
+async def evaluate_single(
+    request: EvaluationRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Evaluate a single test case synchronously."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
-    
     try:
         result = await deepeval_service.evaluate_single(
             request.test_case,
@@ -43,11 +44,11 @@ async def evaluate_single(request: EvaluationRequest):
 
 
 @router.post("/bulk", response_model=BulkEvaluationResponse)
-async def evaluate_bulk(request: BulkEvaluationRequest):
+async def evaluate_bulk(
+    request: BulkEvaluationRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Evaluate multiple test cases synchronously."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
-    
     try:
         evaluation_data = await deepeval_service.evaluate_bulk(
             request.test_cases,
@@ -70,12 +71,10 @@ async def evaluate_bulk(request: BulkEvaluationRequest):
 @router.post("/async", response_model=AsyncEvaluationResponse)
 async def evaluate_async(
     request: EvaluationRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
 ):
     """Start an asynchronous evaluation job for a single test case."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
-    
     # Create job
     job_id = await job_service.create_job(
         job_name=request.job_name,
@@ -101,12 +100,10 @@ async def evaluate_async(
 @router.post("/async/bulk", response_model=AsyncEvaluationResponse)
 async def evaluate_bulk_async(
     request: BulkEvaluationRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
 ):
     """Start an asynchronous evaluation job for multiple test cases."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
-    
     # Create job
     job_id = await job_service.create_job(
         job_name=request.job_name,
@@ -137,12 +134,10 @@ async def evaluate_bulk_async(
 async def evaluate_dataset(
     request: DatasetEvaluationRequest,
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
 ):
     """Evaluate a dataset from uploaded file."""
-    from ..auth import get_current_user
-    current_user = await get_current_user()
-    
     # Validate file size
     if file.size > settings.max_file_size:
         raise HTTPException(
