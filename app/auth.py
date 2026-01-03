@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .models.auth import User
@@ -23,22 +23,33 @@ async def get_current_user_from_token(credentials: Optional[HTTPAuthorizationCre
         return None
 
 
-async def get_current_user_from_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Key")) -> Optional[User]:
+async def get_current_user_from_api_key(request: Request) -> Optional[User]:
     """Get current user from API key."""
-    if not x_api_key:
+    # Try to get API key from header (case-insensitive)
+    api_key = None
+    for header_name, header_value in request.headers.items():
+        if header_name.lower() == "x-api-key":
+            api_key = header_value
+            break
+    
+    if not api_key:
         return None
     
-    if auth_service.validate_api_key(x_api_key):
+    if auth_service.validate_api_key(api_key):
         return auth_service.get_api_user()
     
     return None
 
 
 async def get_current_user(
+    request: Request,
     user_from_token: Optional[User] = Depends(get_current_user_from_token),
-    user_from_api_key: Optional[User] = Depends(get_current_user_from_api_key)
 ) -> User:
     """Get current user from either JWT token or API key."""
+    # Try API key authentication
+    user_from_api_key = await get_current_user_from_api_key(request)
+    
+    # Use token user or API key user
     user = user_from_token or user_from_api_key
     
     if not user:
@@ -63,8 +74,9 @@ async def get_current_admin_user(current_user: User = Depends(get_current_user))
 
 # Optional authentication (doesn't raise error if not authenticated)
 async def get_optional_user(
+    request: Request,
     user_from_token: Optional[User] = Depends(get_current_user_from_token),
-    user_from_api_key: Optional[User] = Depends(get_current_user_from_api_key)
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise None."""
+    user_from_api_key = await get_current_user_from_api_key(request)
     return user_from_token or user_from_api_key

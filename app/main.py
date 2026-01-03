@@ -1,5 +1,6 @@
 import time
 from contextlib import asynccontextmanager
+from typing import Optional
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -109,7 +110,7 @@ app.include_router(jobs_router)
 
 # Root endpoint
 @app.get("/", tags=["Root"])
-async def root(current_user: User = Depends(get_optional_user)):
+async def root(request: Request, current_user: Optional[User] = Depends(get_optional_user)):
     """Root endpoint with basic information."""
     
     if current_user is None:
