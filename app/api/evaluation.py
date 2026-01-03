@@ -24,14 +24,14 @@ job_service = JobService()
 
 @router.post("/", response_model=EvaluationResponse)
 async def evaluate_single(
-    request: EvaluationRequest,
+    evaluation_request: EvaluationRequest,
     current_user: User = Depends(get_current_user)
 ):
     """Evaluate a single test case synchronously."""
     try:
         result = await deepeval_service.evaluate_single(
-            request.test_case,
-            request.metrics
+            evaluation_request.test_case,
+            evaluation_request.metrics
         )
         
         return EvaluationResponse(result=result)
@@ -45,15 +45,15 @@ async def evaluate_single(
 
 @router.post("/bulk", response_model=BulkEvaluationResponse)
 async def evaluate_bulk(
-    request: BulkEvaluationRequest,
+    bulk_request: BulkEvaluationRequest,
     current_user: User = Depends(get_current_user)
 ):
     """Evaluate multiple test cases synchronously."""
     try:
         evaluation_data = await deepeval_service.evaluate_bulk(
-            request.test_cases,
-            request.metrics,
-            max_concurrent=request.max_concurrent or settings.default_max_concurrent
+            bulk_request.test_cases,
+            bulk_request.metrics,
+            max_concurrent=bulk_request.max_concurrent or settings.default_max_concurrent
         )
         
         return BulkEvaluationResponse(
@@ -70,15 +70,15 @@ async def evaluate_bulk(
 
 @router.post("/async", response_model=AsyncEvaluationResponse)
 async def evaluate_async(
-    request: EvaluationRequest,
+    evaluation_request: EvaluationRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
     """Start an asynchronous evaluation job for a single test case."""
     # Create job
     job_id = await job_service.create_job(
-        job_name=request.job_name,
-        tags=request.tags,
+        job_name=evaluation_request.job_name,
+        tags=evaluation_request.tags,
         metadata={"user": current_user.username, "type": "single"}
     )
     
@@ -86,7 +86,7 @@ async def evaluate_async(
     background_tasks.add_task(
         _run_async_single_evaluation,
         job_id,
-        request
+        evaluation_request
     )
     
     job = await job_service.get_job(job_id)
@@ -99,19 +99,19 @@ async def evaluate_async(
 
 @router.post("/async/bulk", response_model=AsyncEvaluationResponse)
 async def evaluate_bulk_async(
-    request: BulkEvaluationRequest,
+    bulk_request: BulkEvaluationRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
     """Start an asynchronous evaluation job for multiple test cases."""
     # Create job
     job_id = await job_service.create_job(
-        job_name=request.job_name,
-        tags=request.tags,
+        job_name=bulk_request.job_name,
+        tags=bulk_request.tags,
         metadata={
             "user": current_user.username,
             "type": "bulk",
-            "test_case_count": len(request.test_cases)
+            "test_case_count": len(bulk_request.test_cases)
         }
     )
     
@@ -119,7 +119,7 @@ async def evaluate_bulk_async(
     background_tasks.add_task(
         _run_async_bulk_evaluation,
         job_id,
-        request
+        bulk_request
     )
     
     job = await job_service.get_job(job_id)
@@ -132,7 +132,7 @@ async def evaluate_bulk_async(
 
 @router.post("/dataset", response_model=AsyncEvaluationResponse)
 async def evaluate_dataset(
-    request: DatasetEvaluationRequest,
+    dataset_request: DatasetEvaluationRequest,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
@@ -147,12 +147,12 @@ async def evaluate_dataset(
     
     # Create job
     job_id = await job_service.create_job(
-        job_name=request.job_name or f"Dataset: {request.dataset_name}",
-        tags=request.tags,
+        job_name=dataset_request.job_name or f"Dataset: {dataset_request.dataset_name}",
+        tags=dataset_request.tags,
         metadata={
             "user": current_user.username,
             "type": "dataset",
-            "dataset_name": request.dataset_name,
+            "dataset_name": dataset_request.dataset_name,
             "file_name": file.filename
         }
     )
@@ -161,7 +161,7 @@ async def evaluate_dataset(
     background_tasks.add_task(
         _run_async_dataset_evaluation,
         job_id,
-        request,
+        dataset_request,
         file
     )
     

@@ -1,5 +1,5 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from typing import Optional
 
 from ..models.health import HealthResponse
@@ -97,4 +97,38 @@ async def detailed_health_check(
             "timeout": settings.default_timeout,
             "api_keys_configured": len(settings.api_keys_list),
         }
+    }
+
+
+@router.get("/debug-auth")
+async def debug_auth(request: Request):
+    """Debug endpoint to check authentication headers (no auth required)."""
+    from ..auth import get_current_user_from_api_key
+    from ..config import settings
+    
+    # Get all headers
+    all_headers = dict(request.headers)
+    
+    # Try to get API key
+    api_key_header = None
+    for header_name, header_value in request.headers.items():
+        if header_name.lower() == "x-api-key":
+            api_key_header = header_value
+            break
+    
+    # Check validation
+    api_key_valid = False
+    if api_key_header:
+        from ..services.auth_service import AuthService
+        auth_service = AuthService()
+        api_key_valid = auth_service.validate_api_key(api_key_header)
+    
+    return {
+        "x_api_key_header_found": api_key_header is not None,
+        "x_api_key_value": api_key_header[:10] + "..." if api_key_header and len(api_key_header) > 10 else api_key_header,
+        "x_api_key_length": len(api_key_header) if api_key_header else 0,
+        "api_key_valid": api_key_valid,
+        "configured_api_keys_count": len(settings.api_keys_list),
+        "configured_api_keys_preview": [key[:10] + "..." if len(key) > 10 else key for key in settings.api_keys_list[:3]],
+        "all_headers": {k: v[:50] + "..." if len(v) > 50 else v for k, v in all_headers.items()},
     }
